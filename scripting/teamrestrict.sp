@@ -16,8 +16,8 @@
 
 //Setup handles and player arrays
 new bool:cw_TeamRestricted[MAXPLAYERS][MAXTEAMS]; //Boolean array containing whether a player has been restricted to a team
-new String:clientId[MAXPLAYERS+1][64]; //Array containing players client index wrt their steamids
-new String:cw_Renamed[MAXPLAYERS+1][MAX_NAME_LENGTH]; //Array containing client's forced names
+new String:clientId[MAXPLAYERS][64]; //Array containing players client index wrt their steamids
+new String:cw_Renamed[MAXPLAYERS][MAX_NAME_LENGTH]; //Array containing client's forced names
 
 //cvar handles
 new Handle:cwH_restrictedMessage = INVALID_HANDLE;
@@ -247,7 +247,7 @@ public Action:unrestrictClientTeam(client, args)
 	new clientIndex = GetClientIndex(steamID);
 	if (!clientIndex)
 	{
-		ReplyToCommand(client, "Unable to get clientIndex of STEAMID %s", steamID);
+		//ReplyToCommand(client, "Unable to get clientIndex of STEAMID %s", steamID);
 		UnbanIDFromTeam(steamID);
 		return Plugin_Handled;
 	}
