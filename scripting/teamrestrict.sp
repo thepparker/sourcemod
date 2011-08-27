@@ -3,6 +3,8 @@
 
 #include "dbi.inc" //Database interface include for SQLite
 
+#pragma semicolon 1 //must use semicolon to end lines
+
 #define PLUGIN_VERSION			"1.2.8"
 #define MAXTEAMS				4
 #define TEAM_AUTO				0
@@ -19,6 +21,8 @@ new bool:cw_TeamRestricted[MAXPLAYERS][MAXTEAMS]; //Boolean array containing whe
 new String:clientId[MAXPLAYERS][64]; //Array containing players client index wrt their steamids
 new String:cw_Renamed[MAXPLAYERS][MAX_NAME_LENGTH]; //Array containing client's forced names
 
+new bool:LateLoaded;
+
 //cvar handles
 new Handle:cwH_restrictedMessage = INVALID_HANDLE;
 
@@ -32,6 +36,12 @@ public Plugin:myinfo =
 	description = "Bunch of different shit for tf2pug/ozf rvb",
 	version = PLUGIN_VERSION,
 	url = "http://www.ipgn.com.au"
+}
+
+public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
+{
+	LateLoaded = late;
+	return APLRes_Success;
 }
 
 public OnPluginStart()
@@ -49,6 +59,19 @@ public OnPluginStart()
 	
 	//Load SQL database up!
 	Setup_Database(); //Specify handle/create table/etc
+	
+	if (LateLoaded)
+	{
+		decl String:auth[64];
+		for (new i = 1; i <= MaxClients; i++)
+		{
+			if (IsClientInGame(i) && !IsFakeClient(i))
+			{
+				GetClientAuthString(i, auth, sizeof(auth));
+				OnClientAuthorized(i, auth);
+			}
+		}
+	}
 }
 
 public OnMapStart()
@@ -509,13 +532,13 @@ public GetClientStoredData(Handle:owner, Handle:hndl, const String:error[], any:
 		if (SQL_GetFieldCount(hndl) > 1)
 		{
 			SQL_FetchString(hndl, 0, queryResult, sizeof(queryResult)); //get the first result
-			bannedTeam = StringToInt(queryResult) //Turn queryResult into usable int
+			bannedTeam = StringToInt(queryResult); //Turn queryResult into usable int
 			SQL_FetchString(hndl, 1, name, sizeof(name)); //player's name when !signup was used
 		}
 		else
 		{
 			SQL_FetchString(hndl, 0, queryResult, sizeof(queryResult)); //get the first result (in this case, the only result)
-			bannedTeam = StringToInt(queryResult) //Turn queryResult into usable int
+			bannedTeam = StringToInt(queryResult); //Turn queryResult into usable int
 		}
 	}
 	else {
@@ -564,7 +587,7 @@ public banTeamQueryCallback(Handle:owner, Handle:hndl, const String:error[], any
 		new bannedTeam = StringToInt(queryResult);
 		if (bannedTeam != teamInt)
 		{
-			Format(query, sizeof(query), "UPDATE player_restrictions SET team='%i' WHERE steam_id='%s'", teamInt, steamID)
+			Format(query, sizeof(query), "UPDATE player_restrictions SET team='%i' WHERE steam_id='%s'", teamInt, steamID);
 			SQL_LockDatabase(SQLiteDB);
 			SQL_FastQuery(SQLiteDB, query); //Fast update query, don't worry about results (we already know it exists... (cause of the callback!))
 			SQL_UnlockDatabase(SQLiteDB);
