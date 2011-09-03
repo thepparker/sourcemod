@@ -5,7 +5,7 @@
 
 #pragma semicolon 1 //must use semicolon to end lines
 
-#define PLUGIN_VERSION			"1.2.8"
+#define PLUGIN_VERSION			"1.3.1"
 #define MAXTEAMS				4
 #define TEAM_AUTO				0
 #define TEAM_SPEC				1
@@ -20,6 +20,7 @@
 new bool:cw_TeamRestricted[MAXPLAYERS][MAXTEAMS]; //Boolean array containing whether a player has been restricted to a team
 new String:clientId[MAXPLAYERS][64]; //Array containing players client index wrt their steamids
 new String:cw_Renamed[MAXPLAYERS][MAX_NAME_LENGTH]; //Array containing client's forced names
+new bool:pugStarted = false;
 
 new bool:LateLoaded;
 
@@ -51,11 +52,15 @@ public OnPluginStart()
 	RegConsoleCmd("cw_unbanteam", unrestrictClientTeam); //unrestrict team
 	RegAdminCmd("cw_forceteam", forceClientTeam, ADMFLAG_RCON, "cw_forceteam <team name> <steamid>"); //forceteam
 	RegConsoleCmd("cw_rename", renameClient); //rename client
-
+	RegConsoleCmd("cw_start", startGame);
+	
 	cwH_restrictedMessage = CreateConVar("cw_restricted_message", "WE'RE AT WAR, CHUMP. NO TIME FOR FRATERNISING", "What to show the player when they try to join a restricted team", FCVAR_PLUGIN);
 	CreateConVar("cw_version", PLUGIN_VERSION,"CW TR Version", FCVAR_PLUGIN|FCVAR_NOTIFY|FCVAR_REPLICATED|FCVAR_DONTRECORD);
 	
 	//HookEvent("player_changename", playerNameChangeHook, EventHookMode_Pre); //Hook name change event (generic source)
+	HookEvent("teamplay_game_over", gameOverHook); //Hook the end game event to reset the pugStarted bool - fired for win conditions: timelimit/winlimit/maxrounds
+	HookEvent("tf_game_over", gameOverHook);  //Same as teamplay_game_over, but fires on windifference and other tf only win conditions
+	//HookEvent("player_disconnect", playerDisconnect); //Hook the disconnect event, so we can make sure the bot always knows a client dc'd
 	
 	//Load SQL database up!
 	Setup_Database(); //Specify handle/create table/etc
@@ -110,10 +115,15 @@ public OnClientDisconnect(client)
 {
 	strcopy(clientId[client], sizeof(clientId[]), "\0"); //clear clientId array for client
 	strcopy(cw_Renamed[client], sizeof(cw_Renamed[]), "\0");
+	//"SonofDad<59><STEAM_0:0:5188240><Blue>" disconnected (reason "Kicked by Console : Pug is over")
 }
 
 public Action:clientJoinTeam(client, const String:command[], args)
 {
+	if (pugStarted)
+	{
+		return Plugin_Continue;
+	}
 	decl String:buffer[10];
 	GetCmdArg(1,buffer,sizeof(buffer));
 	StripQuotes(buffer);
@@ -173,12 +183,25 @@ public Action:clientJoinTeam(client, const String:command[], args)
 
 	return Plugin_Continue;
 }
+/////////////////////////////////////////////start game////////////////////////////////////////////
+public Action:startGame(client, args)
+{
+	if (client != 0)
+	{
+		ReplyToCommand(client, "YOU DO NOT HAVE PERMISSION");
+		return Plugin_Handled;
+	}
+	ServerCommand("exec start.cfg");
+	pugStarted = true;
+	return Plugin_Handled;
+}
 //////////////////////////////////////////////////rename/////////////////////////////////////////////
 public Action:renameClient(client, args)
 {
 	if (client != 0)
 	{
 		ReplyToCommand(client, "YOU DO NOT HAVE PERMISSION");
+		return Plugin_Handled;
 	}
 	if (args < 2) 
 	{
@@ -480,6 +503,17 @@ bool:AutoAssign(client) //When a client uses the "Auto-Team" button
 		return true;
 	}
 }
+
+/////////////////////////////////////////////////////////////////////
+//Event hooks
+/////////////////////////////////////////////////////////////////////
+
+//HookEvent("teamplay_game_over", gameOver);
+public gameOverHook(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	//set pugStarted bool to false, so teams are once again locked - dont actually care about win reasons or anything
+	pugStarted = false;
+}
 //Game doesn't accept hooking and modifying of the "player_changename" event apparently...
 /*public playerNameChangeHook(Handle:event, const String:name[], bool:dontBroadcast)
 {
@@ -492,6 +526,7 @@ bool:AutoAssign(client) //When a client uses the "Auto-Team" button
 	
 	return Plugin_Handled;
 }*/
+
 /////////////////////////////////////////////////////////////////////
 //SQL Callbacks
 /////////////////////////////////////////////////////////////////////
