@@ -76,6 +76,7 @@ public OnPluginStart()
 				OnClientAuthorized(i, auth);
 			}
 		}
+		pugStarted = true;
 	}
 }
 
