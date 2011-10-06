@@ -1,3 +1,20 @@
+/*
+    Copyright (C) 2011 P. "bladez" Parker
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <sourcemod>
 #include <sdktools> //for sdk functions like renaming (actually all i use it for...)
 
@@ -108,7 +125,7 @@ public OnClientAuthorized(client, const String:auth[])
 	Format(query, sizeof(query), "SELECT team, name FROM player_restrictions WHERE steam_id='%s'", auth); //get player's banned team
 	SQL_TQuery(SQLiteDB, GetClientStoredData, query, dataPack, DBPrio_High); //threaded query with high priority (we want this shit done QUICK!)
 	
-	LogMessage("We have a SteamID! %s Value of clientId[%i]: %s", auth, client, clientId[client]);
+	LogMessage("We have a SteamID! %N Value of clientId[%i]: %s", auth, client, clientId[client]);
 	//CloseHandle(dataPack);
 }
 
@@ -227,7 +244,7 @@ public Action:renameClient(client, args)
 	{
 		total_len += len;
 	}
-	else //fuck knows what this else thing does. sets the first char of arg_string to 0 but wat does that do?
+	else //terminate arg_string at index 0
 	{
 		total_len = 0;
 		arg_string[0] = '\0';
@@ -283,7 +300,7 @@ public Action:unrestrictClientTeam(client, args)
 	{
 		total_len += len;
 	}
-	else //fuck knows what this else thing does. sets the first char of arg_string to 0 but wat does that do?
+	else
 	{
 		total_len = 0;
 		arg_string[0] = '\0';
@@ -340,7 +357,7 @@ public Action:restrictClientTeam(client,args)
 	{
 		total_len += len;
 	}
-	else //fuck knows what this else thing does. sets the first char of arg_string to 0 but wat does that do?
+	else
 	{
 		total_len = 0;
 		arg_string[0] = '\0';
@@ -438,7 +455,7 @@ public Action:forceClientTeam(client,args)
 	{
 		total_len += len;
 	}
-	else //fuck knows what this else thing does. sets the first char of arg_string to 0 but wat does that do?
+	else
 	{
 		total_len = 0;
 		arg_string[0] = '\0';
