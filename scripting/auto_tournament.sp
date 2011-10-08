@@ -1,9 +1,13 @@
 #include <sourcemod>
 #include "include/nextmap.inc" //include for sourcemod next/set/get map functions
+#include <sdktools>
 
 #pragma semicolon 1 //must use semicolon to end lines
 
-#define PLUGIN_VERSION			"1.0.9"
+#define PLUGIN_VERSION			"1.0.10"
+
+#define TEAM_RED				2
+#define TEAM_BLU				3
 
 ///////////////////////////
 //Global vars and handles
@@ -59,7 +63,7 @@ public OnMapStart()
 	//disable tournament mode and set gamestarted to false incase of manual change or whatever
 	if (gameStarted)
 	{
-		ServerCommand("mp_tournament 0");
+		ServerCommand("mp_tournament 0; mp_winlimit 0");
 		gameStarted = false;
 	}
 }
@@ -94,7 +98,7 @@ public roundStartHook(Handle:event, const String:name[], bool:dontBroadcast)
 	//End of waiting for players; enable tournament mode and set ready states to 1
 	if (!gameStarted)
 	{
-		ServerCommand("mp_tournament 1;mp_restartgame 1");
+		ServerCommand("mp_tournament 1; mp_restartgame 1");
 		gameStarted = true;
 	}
 }
@@ -108,7 +112,6 @@ public gameOverHook(Handle:event, const String:name[], bool:dontBroadcast)
 	if (gameStarted)
 	{
 		//end of map, changelevel in 10 seconds (same as normal)
-		gameStarted = false;
 		CreateTimer(10.0, changeMap, 0, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
@@ -126,13 +129,21 @@ public roundWinHook(Handle:event, const String:name[], bool:dontBroadcast)
 	{
 		if ((timeLeft != 0) && (timeLeft < 300))
 		{
-			//timeleft is < 5 mins at end of full round, therefore, end the map
-			decl bonusRoundTime;
-			bonusRoundTime = GetConVarInt(FindConVar("mp_bonusroundtime")) - 3;
-			new Float:floatedRoundTime = float(bonusRoundTime);
-			LogMessage("end of full round and timelimit < 300, starting ending timer to run in %f", floatedRoundTime);
-			//ServerCommand("mp_tournament 0");
-			CreateTimer(FloatAbs(floatedRoundTime), endMap, 0, TIMER_FLAG_NO_MAPCHANGE);
+			//timeleft is < 5 mins at end of full round, therefore, set winlimit to highest current score, and map ends
+			new redScore = GetTeamScore(TEAM_RED);
+			new blueScore = GetTeamScore(TEAM_BLU);
+			if (redScore > blueScore)
+			{
+				ServerCommand("mp_winlimit %d", redScore);
+			}
+			else if (blueScore > redScore)
+			{
+				ServerCommand("mp_winlimit %d", blueScore);
+			}
+			else
+			{
+				ServerCommand("mp_winlimit %d", blueScore);
+			}
 		}
 	}
 }
@@ -143,18 +154,6 @@ public roundWinHook(Handle:event, const String:name[], bool:dontBroadcast)
 //Private functions
 /////////////////////////////////////////////////////////////////////
 //need public action for a timer, but it's still 'private'
-public Action:endMap(Handle:timer, any:data)
-{
-	LogMessage("end map timer called. firing game over event");
-	new Handle:gameOverEvent = CreateEvent("tf_game_over");
-	if (gameOverEvent == INVALID_HANDLE)
-	{
-		return;
-	}
-	
-	SetEventString(gameOverEvent, "reason", "Reached Time Limit");
-	FireEvent(gameOverEvent);
-}
 public Action:changeMap(Handle:timer, any:data)
 {
 	//data is the map, which is passed when the timer is called
