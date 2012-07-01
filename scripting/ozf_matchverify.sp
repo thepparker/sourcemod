@@ -296,6 +296,8 @@ public parseClanName(Handle:hndl, const String:buffer[], const bytes, const nMem
     SetTrieString(g_hClanNameTrie, clanID, buffer, true);
     
     CloseHandle(data);
+    
+    return bytes*nMemB;
 }
 
 verifyClients()
