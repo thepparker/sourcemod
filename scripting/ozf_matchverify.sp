@@ -245,32 +245,37 @@ getClanNames(const String:cID[])
     
     if ((numID = ExplodeString(cID, ",", clanArray, 17, sizeof(clanArray[]))) > 0)
     {
-        decl String:cnURL[256], String:apiAuthKey[64];
+        decl String:cnURL[256], String:apiAuthKey[64], String:cId[16], String:cName[64];
         
         GetConVarString(g_hMVApiKey, apiAuthKey, sizeof(apiAuthKey));
         
         for (new i = 0; i < numID; i++)
         {
-            new Handle:clanNameGET = curl_easy_init();
+            strcopy(cId, sizeof(cId), clanArray[i]);
             
-            if (clanNameGET != INVALID_HANDLE)
+            if (!GetTrieString(g_hClanNameTrie, cId, cName, sizeof(cName)))
             {
-                CURL_DEFAULT_OPTIONS(clanNameGET);
+                new Handle:clanNameGET = curl_easy_init();
                 
-                new Handle:dataPack = CreateDataPack();
-                WritePackString(dataPack, clanArray[i]);
-                
-                curl_easy_setopt_function(clanNameGET, CURLOPT_WRITEFUNCTION, parseClanName, dataPack);
-                
-                Format(cnURL, sizeof(cnURL), "http://ozfortress.com/serverdata.php?key=%s&do=getclanshortname&clanid=%d",
-                                            apiAuthKey,
-                                            StringToInt(clanArray[i]));
-                
-                curl_easy_setopt_string(clanNameGET, CURLOPT_URL, cnURL);
-                
-                curl_easy_perform_thread(clanNameGET, curlErrorCheck, dataPack);
-                
-                debugMessage("Getting clan name for clan ID %s", clanArray[i]);
+                if (clanNameGET != INVALID_HANDLE)
+                {
+                    CURL_DEFAULT_OPTIONS(clanNameGET);
+                    
+                    new Handle:dataPack = CreateDataPack();
+                    WritePackString(dataPack, cId);
+                    
+                    curl_easy_setopt_function(clanNameGET, CURLOPT_WRITEFUNCTION, parseClanName, dataPack);
+                    
+                    Format(cnURL, sizeof(cnURL), "http://ozfortress.com/serverdata.php?key=%s&do=getclanshortname&clanid=%d",
+                                                apiAuthKey,
+                                                StringToInt(cId));
+                    
+                    curl_easy_setopt_string(clanNameGET, CURLOPT_URL, cnURL);
+                    
+                    curl_easy_perform_thread(clanNameGET, curlErrorCheck, dataPack);
+                    
+                    debugMessage("Getting clan name for clan ID %s", cId);
+                }
             }
         }
     }
@@ -295,7 +300,7 @@ public parseClanName(Handle:hndl, const String:buffer[], const bytes, const nMem
 
 verifyClients()
 {
-
+    //do stuff
 }
 
 //---------------
