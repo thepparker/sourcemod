@@ -17,7 +17,7 @@
 #pragma dynamic 32767 // NFI what this does, but without it the server will crash!
 
 //----------------
-//MACROS
+//DEFINES
 //----------------
 
 #define PLUGIN_NAME         "ozfortress steam id verifier"
@@ -26,8 +26,6 @@
                              correct players are playing"
 #define PLUGIN_VERSION      "1.0.0"
 #define PLUGIN_URL          "http://asdf.com"
-
-#define CURL_DEFAULT_OPTIONS(%1) curl_easy_setopt_int_array(%1, CURL_Default_Options, sizeof(CURL_Default_Options))
 
 //----------------
 //GLOBALS
@@ -184,7 +182,7 @@ getClanID(const String:auth[])
     
     if (idGET != INVALID_HANDLE)
     {
-        CURL_DEFAULT_OPTIONS(idGET);
+        curl_easy_setopt_int_array(idGET, CURL_Default_Options, sizeof(CURL_Default_Options));
         
         new Handle:dataPack = CreateDataPack();
         WritePackString(dataPack, auth);
@@ -259,7 +257,7 @@ getClanNames(const String:cID[])
                 
                 if (clanNameGET != INVALID_HANDLE)
                 {
-                    CURL_DEFAULT_OPTIONS(clanNameGET);
+                    curl_easy_setopt_int_array(clanNameGET, CURL_Default_Options, sizeof(CURL_Default_Options));
                     
                     new Handle:dataPack = CreateDataPack();
                     WritePackString(dataPack, cId);
