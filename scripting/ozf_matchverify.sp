@@ -199,7 +199,7 @@ getClanID(const String:auth[])
         
         curl_easy_setopt_string(idGET, CURLOPT_URL, cidURL);
         
-        curl_easy_perform_thread(idGET, curlErrorCheck, dataPack);
+        curl_easy_perform_thread(idGET, curlErrorCheck);
         
         debugMessage("Getting clan IDs for client %s", auth);
     }
@@ -209,6 +209,7 @@ getClanID(const String:auth[])
 public parseClanID(Handle:hndl, const String:buffer[], const bytes, const nMemB, any:data)
 {
     decl String:auth[64];
+    ResetPack(data);
     ReadPackString(data, auth, sizeof(auth));
 
     debugMessage("cURL returned string \"%s\" for client with steamID %s", buffer, auth);
@@ -217,16 +218,13 @@ public parseClanID(Handle:hndl, const String:buffer[], const bytes, const nMemB,
     
     getClanNames(buffer);
     
-    CloseHandle(data);
+    //CloseHandle(data);
     
     return bytes*nMemB;
 }
 
 public curlErrorCheck(Handle:hndl, CURLcode:errorCode, any:data)
 {
-    if (data != INVALID_HANDLE)
-        CloseHandle(data);
-
     if (errorCode != CURLE_OK)
     {
         decl String:errorBuff[256];
@@ -270,7 +268,7 @@ getClanNames(const String:cID[])
                     
                     curl_easy_setopt_string(clanNameGET, CURLOPT_URL, cnURL);
                     
-                    curl_easy_perform_thread(clanNameGET, curlErrorCheck, dataPack);
+                    curl_easy_perform_thread(clanNameGET, curlErrorCheck);
                     
                     debugMessage("Getting clan name for clan ID %s", cId);
                 }
@@ -287,6 +285,7 @@ public parseClanName(Handle:hndl, const String:buffer[], const bytes, const nMem
 {
     //buffer = clan name
     decl String:clanID[16];
+    ResetPack(data);
     ReadPackString(data, clanID, sizeof(clanID));
     
     debugMessage("Got clan name %s for clan id %s", buffer, clanID);
