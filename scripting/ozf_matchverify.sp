@@ -213,18 +213,20 @@ getClanID(const String:auth[])
 
 public parseClanID(Handle:hndl, const String:buffer[], const bytes, const nMemB, any:data)
 {
-    decl String:auth[64];
-    ResetPack(data);
-    ReadPackString(data, auth, sizeof(auth));
+    if (!StrEqual(buffer, "unknown"))
+    {
+        decl String:auth[64];
+        ResetPack(data);
+        ReadPackString(data, auth, sizeof(auth));
 
-    debugMessage("cURL returned string \"%s\" for client with steamID %s", buffer, auth);
-    
-    SetTrieString(g_hClanIDTrie, auth, buffer, true);
-    
-    getClanNames(buffer);
-    
-    //CloseHandle(data);
-    
+        debugMessage("cURL returned string \"%s\" for client with steamID %s", buffer, auth);
+        
+        SetTrieString(g_hClanIDTrie, auth, buffer, true);
+        
+        getClanNames(buffer);
+        
+        CloseHandle(data);
+    }
     return bytes*nMemB;
 }
 
@@ -289,16 +291,18 @@ getClanNames(const String:cID[])
 public parseClanName(Handle:hndl, const String:buffer[], const bytes, const nMemB, any:data)
 {
     //buffer = clan name
-    decl String:clanID[16];
-    ResetPack(data);
-    ReadPackString(data, clanID, sizeof(clanID));
-    
-    debugMessage("Got clan name %s for clan id %s", buffer, clanID);
-    
-    SetTrieString(g_hClanNameTrie, clanID, buffer, true);
-    
-    CloseHandle(data);
-    
+    if (!StrEqual(buffer, "unknown"))
+    {
+        decl String:clanID[16];
+        ResetPack(data);
+        ReadPackString(data, clanID, sizeof(clanID));
+        
+        debugMessage("Got clan name %s for clan id %s", buffer, clanID);
+        
+        SetTrieString(g_hClanNameTrie, clanID, buffer, true);
+        
+        CloseHandle(data);
+    }
     return bytes*nMemB;
 }
 
@@ -307,10 +311,18 @@ verifyClients()
     new Handle:clanIdReturn = CreateDataPack();
     getClansPlaying(clanIdReturn);
     
+    new playerCount = ReadPackCell(clanIdReturn);
     new redClanId = ReadPackCell(clanIdReturn); //according to packing order, red is first. 1 cell is 1 int in size
     new blueClanId = ReadPackCell(clanIdReturn);
     
     debugMessage("CLAN IDS RETURNED: %d, %d", redClanId, blueClanId);
+    
+    new bool:bReportInvalid = true;
+    
+    if (playerCount < 7) //less than 7 players in high clans, therefore not official match
+    {
+        bReportInvalid = false; //don't worry about invalid players
+    }
     
     if (blueClanId && redClanId) //make sure we have 2 clan ids
     //if (redClanId) //debug
@@ -351,7 +363,8 @@ verifyClients()
                             if (!bClientLegit)
                             {
                                 debugMessage("Client %d (%s) is not registered with the red or blue teams", i, auth);
-                                //reportInvalidPlayer(auth);
+                                if (bReportInvalid)
+                                    reportInvalidPlayer(auth);
                             }
                             //reportInvalidPlayer(auth);
                         }
@@ -376,39 +389,51 @@ getClansPlaying(Handle:hndl)
     
     for (new i = 1; i <= MaxClients; i++)
     {
-        strcopy(auth, sizeof(auth), cAuthArray[i]);
-        
-        if (GetTrieString(g_hClanIDTrie, auth, clanIdList, sizeof(clanIdList)))
+        if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
         {
-            if ((numID =  ExplodeString(clanIdList, ",", clanArray, 17, sizeof(clanArray[]))) > 0)
+            strcopy(auth, sizeof(auth), cAuthArray[i]);
+            
+            if (GetTrieString(g_hClanIDTrie, auth, clanIdList, sizeof(clanIdList)))
             {
-                for (new j = 0; j < numID; j++)
+                if ((numID =  ExplodeString(clanIdList, ",", clanArray, 17, sizeof(clanArray[]))) > 0)
                 {
-                    if (GetClientTeam(i) == TEAM_RED)
+                    switch (GetClientTeam(i))
                     {
-                        strcopy(clanId, sizeof(clanId), clanArray[j]);
-                        if (!GetTrieValue(redClanIdIndex, clanId, clanValue))
+                        case TEAM_RED:
                         {
-                            PushArrayString(redClanArray, clanId);
-                            SetTrieValue(redClanIdIndex, clanId, 1);
+                            for (new j = 0; j < numID; j++)
+                            {
+                                strcopy(clanId, sizeof(clanId), clanArray[j]);
+                                if (!GetTrieValue(redClanIdIndex, clanId, clanValue))
+                                {
+                                    PushArrayString(redClanArray, clanId);
+                                    SetTrieValue(redClanIdIndex, clanId, 1);
+                                }
+                                else
+                                {
+                                    SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                                }
+                            }
                         }
-                        else
+                        case TEAM_BLUE:
                         {
-                            SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                            for (new j = 0; j < numID; j++)
+                            {
+                                strcopy(clanId, sizeof(clanId), clanArray[j]);
+                                if (!GetTrieValue(blueClanIdIndex, clanId, clanValue))
+                                {
+                                    PushArrayString(blueClanArray, clanId);
+                                    SetTrieValue(blueClanIdIndex, clanId, 1);
+                                }
+                                else
+                                {
+                                    SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                                }
+                            }
                         }
-                        
-                    }
-                    else if (GetClientTeam(i) == TEAM_BLUE)
-                    {
-                        strcopy(clanId, sizeof(clanId), clanArray[j]);
-                        if (!GetTrieValue(blueClanIdIndex, clanId, clanValue))
+                        default:
                         {
-                            PushArrayString(blueClanArray, clanId);
-                            SetTrieValue(blueClanIdIndex, clanId, 1);
-                        }
-                        else
-                        {
-                            SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                            continue;
                         }
                     }
                     
@@ -417,10 +442,10 @@ getClansPlaying(Handle:hndl)
                         debugMessage("Client %s has clan id %s named %s", auth, clanId, clanName);
                     }
                 }
-            }
-            else
-            {
-                debugMessage("Invalid list of clan ids stored for %s - %s", auth, clanIdList);
+                else
+                {
+                    debugMessage("Invalid list of clan ids stored for %s - %s", auth, clanIdList);
+                }
             }
         }
     }
@@ -468,6 +493,7 @@ getClansPlaying(Handle:hndl)
     CloseHandle(blueClanArray);
     CloseHandle(blueClanIdIndex);
     
+    WritePackCell(hndl, redCount + blueCount);
     WritePackCell(hndl, redClanId);
     WritePackCell(hndl, blueClanId);
     ResetPack(hndl);
