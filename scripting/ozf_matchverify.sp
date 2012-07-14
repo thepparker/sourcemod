@@ -322,33 +322,38 @@ verifyClients()
         decl junk, numID;
         new bool:bClientLegit;
         
-        for (new i = 0; i <= MaxClients; i++)
+        for (new i = 1; i <= MaxClients; i++)
         {
-            strcopy(auth, sizeof(auth), cAuthArray[i]);
-            
-            if (!GetTrieValue(g_hClientVerified, auth, junk))
+            if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
             {
-                if (GetTrieString(g_hClanIDTrie, auth, clanIdList, sizeof(clanIdList)))
+                strcopy(auth, sizeof(auth), cAuthArray[i]);
+                
+                if (!GetTrieValue(g_hClientVerified, auth, junk))
                 {
-                    if ((numID =  ExplodeString(clanIdList, ",", clanArray, 17, sizeof(clanArray[]))) > 0)
+                    if (GetTrieString(g_hClanIDTrie, auth, clanIdList, sizeof(clanIdList)))
                     {
-                        bClientLegit = false;
-                        for (new j = 0; j < numID; j++)
+                        if ((numID =  ExplodeString(clanIdList, ",", clanArray, 17, sizeof(clanArray[]))) > 0)
                         {
-                            strcopy(clanId, sizeof(clanId), clanArray[j]);
-                            
-                            if (StrEqual(redClan, clanId) || StrEqual(blueClan, clanId))
+                            bClientLegit = false;
+                            for (new j = 0; j < numID; j++)
                             {
-                                bClientLegit = true;
-                                new tmpInt = StringToInt(clanId);
-                                debugMessage("Client %d (%s) verified. Belongs to clan %d", i, auth, tmpInt);
-                                SetTrieValue(g_hClientVerified, auth, tmpInt);
+                                strcopy(clanId, sizeof(clanId), clanArray[j]);
+                                
+                                if (StrEqual(redClan, clanId) || StrEqual(blueClan, clanId)) //in red or blue team, doesn't matter
+                                {
+                                    bClientLegit = true;
+                                    new tmpInt = StringToInt(clanId);
+                                    debugMessage("Client %d (%s) verified. Belongs to clan %d", i, auth, tmpInt);
+                                    SetTrieValue(g_hClientVerified, auth, tmpInt);
+                                }
                             }
-                        }
-                        
-                        if (!bClientLegit)
-                        {
-                            debugMessage("Client %d (%s) is not registered with the red or blue teams", i, auth);
+                            
+                            if (!bClientLegit)
+                            {
+                                debugMessage("Client %d (%s) is not registered with the red or blue teams", i, auth);
+                                //reportInvalidPlayer(auth);
+                            }
+                            //reportInvalidPlayer(auth);
                         }
                     }
                 }
@@ -361,15 +366,13 @@ getClansPlaying(Handle:hndl)
 {
     decl String:auth[64], String:clanArray[16][64], String:clanIdList[128], String:clanId[16], String:clanName[64];
     
-    decl numID, junk;
+    decl numID, clanValue;
     
-    new iRedClanCount[512], numRedClans = 0;
+    new Handle:redClanArray = CreateArray(32); //hold clan ids for the index array based on indexes i.e redClanArray[0]->clanId, redClanIdIndex[clanId]->clanValue
     new Handle:redClanIdIndex = CreateTrie();
-    new Handle:redClanIdIndexReverse = CreateTrie();
     
-    new iBlueClanCount[512], numBlueClans = 0;
+    new Handle:blueClanArray = CreateArray(32);
     new Handle:blueClanIdIndex = CreateTrie();
-    new Handle:blueClanIdIndexReverse = CreateTrie();
     
     for (new i = 1; i <= MaxClients; i++)
     {
@@ -384,30 +387,29 @@ getClansPlaying(Handle:hndl)
                     if (GetClientTeam(i) == TEAM_RED)
                     {
                         strcopy(clanId, sizeof(clanId), clanArray[j]);
-                        if (!GetTrieValue(redClanIdIndex, clanId, junk))
+                        if (!GetTrieValue(redClanIdIndex, clanId, clanValue))
                         {
-                            SetTrieValue(redClanIdIndex, clanId, numRedClans);
-                            
-                            decl String:tmp[16];
-                            IntToString(numRedClans, tmp, sizeof(tmp));
-                            SetTrieString(redClanIdIndexReverse, tmp, clanId);
+                            PushArrayString(redClanArray, clanId);
+                            SetTrieValue(redClanIdIndex, clanId, 1);
                         }
-                        iRedClanCount[numRedClans] += 1;
-                        numRedClans++;
+                        else
+                        {
+                            SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                        }
+                        
                     }
                     else if (GetClientTeam(i) == TEAM_BLUE)
                     {
                         strcopy(clanId, sizeof(clanId), clanArray[j]);
-                        if (!GetTrieValue(blueClanIdIndex, clanId, junk))
+                        if (!GetTrieValue(blueClanIdIndex, clanId, clanValue))
                         {
-                            SetTrieValue(blueClanIdIndex, clanId, numBlueClans);
-                            
-                            decl String:tmp[16];
-                            IntToString(numRedClans, tmp, sizeof(tmp));
-                            SetTrieString(blueClanIdIndexReverse, tmp, clanId);
+                            PushArrayString(blueClanArray, clanId);
+                            SetTrieValue(blueClanIdIndex, clanId, 1);
                         }
-                        iBlueClanCount[numBlueClans] += 1;
-                        numBlueClans++;
+                        else
+                        {
+                            SetTrieValue(redClanIdIndex, clanId, clanValue + 1);
+                        }
                     }
                     
                     if (GetTrieString(g_hClanNameTrie, clanId, clanName, sizeof(clanName)))
@@ -423,73 +425,119 @@ getClansPlaying(Handle:hndl)
         }
     }
     
-    new redCount, blueCount, redClanId, blueClanId, clanIdNum, curCount;
-    decl String:tmp[16];
+    new redCount, blueCount, redClanId, blueClanId, curCount;
+    decl String:tmp[32];
 
-    for (new i = 0; i < numRedClans; i++)
+    for (new i = 0; i < GetArraySize(redClanArray); i++)
     {
-        curCount = iRedClanCount[i];
-        IntToString(i, tmp, sizeof(tmp));
+        GetArrayString(redClanArray, i, tmp, sizeof(tmp)); //will be a clan id as a string
+    
+        GetTrieValue(redClanIdIndex, tmp, curCount);
         
-        GetTrieString(redClanIdIndexReverse, tmp, clanId, sizeof(clanId));
-        clanIdNum = StringToInt(clanId);
-        
-        
-        debugMessage("Red clan id %s has weighting of %d", clanId, curCount);
+        debugMessage("Red clan id %s has weighting of %d", tmp, curCount);
         
         if (curCount > redCount)
         {        
             redCount = curCount;
-            redClanId = clanIdNum;
+            redClanId = StringToInt(tmp);
         }
     }
     
-    for (new i = 0; i < numBlueClans; i++)
+    for (new i = 0; i < GetArraySize(blueClanArray); i++)
     {
-        curCount = iBlueClanCount[i];
-        IntToString(i, tmp, sizeof(tmp));
+        GetArrayString(blueClanArray, i, tmp, sizeof(tmp));
         
-        GetTrieString(blueClanIdIndexReverse, tmp, clanId, sizeof(clanId));
-        clanIdNum = StringToInt(clanId);
+        GetTrieValue(blueClanIdIndex, tmp, curCount);              
         
-        
-        debugMessage("Blue clan id %s has weighting of %d", clanId, curCount);
+        debugMessage("Blue clan id %s has weighting of %d", tmp, curCount);
         
         if (curCount > blueCount)
         {        
             blueCount = curCount;
-            blueClanId = clanIdNum;
+            blueClanId = StringToInt(tmp);
         }
     }
     
     debugMessage("Red count: %d for %d. Blue count: %d for %d", redCount, redClanId,
                                                                 blueCount, blueClanId);
     
-    decl String:redClanName[64], String:blueClanName[64];
+    debugMessage("Two teams playing are: %d and %d", redClanId, blueClanId);
     
-    IntToString(redClanId, tmp, sizeof(tmp));
-    GetTrieString(g_hClanNameTrie, tmp, redClanName, sizeof(redClanName));
-    
-    if (strlen(redClanName) == 0)
-        Format(redClanName, sizeof(redClanName), "NONE");
-    
-    IntToString(blueClanId, tmp, sizeof(tmp));
-    GetTrieString(g_hClanNameTrie, tmp, blueClanName, sizeof(blueClanName));
-    
-    if (strlen(blueClanName) == 0)
-        Format(blueClanName, sizeof(redClanName), "NONE");
-    
-    debugMessage("Two teams playing are: %s and %s", redClanName, blueClanName);
-    
+    CloseHandle(redClanArray);
     CloseHandle(redClanIdIndex);
-    CloseHandle(redClanIdIndexReverse);
+    CloseHandle(blueClanArray);
     CloseHandle(blueClanIdIndex);
-    CloseHandle(blueClanIdIndexReverse);
     
     WritePackCell(hndl, redClanId);
     WritePackCell(hndl, blueClanId);
     ResetPack(hndl);
     return;
+}
+
+/*reporting invalid players to IRC*/
+reportInvalidPlayer(const String:auth[])
+{
+    debugMessage("Reporting player %s for invalid ID", auth);
+    
+    new Handle:reportCURL = curl_easy_init();
+    if (reportCURL != INVALID_HANDLE)
+    {
+        //210.50.4.5:6002
+        decl String:reportServerIP[64];
+        Format(reportServerIP, sizeof(reportServerIP), "udp://210.50.4.5");
+        
+        new reportServerPort = 6002;
+        
+        new Handle:dataPack = CreateDataPack();
+        WritePackString(dataPack, auth);
+        ResetPack(dataPack);
+        
+        curl_easy_setopt_int_array(reportCURL, CURL_Default_Options, sizeof(CURL_Default_Options));
+        
+        curl_easy_setopt_string(reportCURL, CURLOPT_URL, reportServerIP);
+        curl_easy_setopt_int(reportCURL, CURLOPT_PORT, reportServerPort);
+        
+        curl_easy_setopt_int(reportCURL, CURLOPT_CONNECT_ONLY, 1);
+        
+        curl_easy_perform_thread(reportCURL, reportServerConnectCallback, dataPack);
+    }
+}
+
+public SendRecv_Act:reportSendCallback(Handle:hndl, CURLcode:code, const last_sent_dataSize)
+{
+    debugMessage("Sending callback hit");
+    return SendRecv_Act_GOTO_RECV;
+}
+
+public SendRecv_Act:reportReceiveCallback(Handle:hndl, CURLcode:code, const String:receiveData[], const dataSize)
+{
+    debugMessage("data receive callback");
+    return SendRecv_Act_GOTO_END;
+}
+
+public reportSARCompleteCallback(Handle:hndl, CURLcode:code)
+{
+    debugMessage("socket closing");
+    CloseHandle(hndl); //hndl is the handle of our curl connection
+}
+
+public reportServerConnectCallback(Handle:hndl, CURLcode:code, any:data)
+{
+    debugMessage("connect callback reached");
+    decl String:auth[64];
+    ReadPackString(data, auth, sizeof(auth));
+    
+    if (code == CURLE_OK)
+    {
+        curl_easy_send_recv(hndl, reportSendCallback, reportReceiveCallback, reportSARCompleteCallback, SendRecv_Act_GOTO_WAIT, 0, 0);
+        
+        decl String:tmp[128];
+        Format(tmp, sizeof(tmp), "INVALID_ID%%%s", auth);
+        
+        curl_set_send_buffer(hndl, tmp, sizeof(tmp));
+        curl_send_recv_Signal(hndl, SendRecv_Act_GOTO_SEND);
+        debugMessage("Attempting to send data %s", tmp);
+    }
 }
 
 //---------------
