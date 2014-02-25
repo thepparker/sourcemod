@@ -3,7 +3,7 @@
 
 #pragma semicolon 1
 
-#define PLUGIN_VERSION      "1.0.0"
+#define PLUGIN_VERSION      "1.1.0"
 
 new String:client_auth_cache[MAXPLAYERS+1][64];
 new bool:LateLoaded = false;
@@ -46,6 +46,26 @@ public OnPluginStart()
 public OnClientAuthorized(client, const String:auth[])
 {
     strcopy(client_auth_cache[client], sizeof(client_auth_cache[]), auth);
+
+    decl String:ip[64];
+
+    if (GetClientIP(client, ip, sizeof(ip)))
+    {
+        decl String:name[MAX_NAME_LENGTH];
+
+        if (!GetClientName(client, name, sizeof(name)))
+            return;
+
+        new userid = GetClientUserId(client);
+
+        //"nawtyr<10><STEAM_1:0:18590704><>" connected, address ""
+        LogToGame("\"%s<%d><%s><>\" connect_ex, address \"%s\"",
+                name,
+                userid,
+                auth,
+                ip
+            );
+    }
 }
 
 public Action:ipgnSayCommand(args)
