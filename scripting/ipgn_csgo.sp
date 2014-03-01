@@ -3,7 +3,7 @@
 
 #pragma semicolon 1
 
-#define PLUGIN_VERSION      "1.1.0"
+#define PLUGIN_VERSION      "1.1.1"
 
 new String:client_auth_cache[MAXPLAYERS+1][64];
 new bool:LateLoaded = false;
@@ -40,12 +40,19 @@ public OnPluginStart()
                 OnClientAuthorized(i, auth);
             }
         }
+
+
+        LateLoaded = false;
     }
 }
 
 public OnClientAuthorized(client, const String:auth[])
 {
     strcopy(client_auth_cache[client], sizeof(client_auth_cache[]), auth);
+
+    // don't need to log these details if it's a late load
+    if (LateLoaded) 
+        return;
 
     decl String:ip[64];
 
